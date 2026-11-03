@@ -1,0 +1,26 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 重要：請替換成 Firebase Authentication 中教師帳號的 UID。
+    function teacher() { return request.auth != null && request.auth.uid == 'REPLACE_WITH_TEACHER_UID'; }
+    function signedIn() { return request.auth != null; }
+    match /kongRooms/{roomId} {
+      allow read: if signedIn();
+      allow create, update, delete: if teacher();
+      match /messages/{messageId} {
+        allow read: if signedIn();
+        allow create: if signedIn()
+          && exists(/databases/$(database)/documents/kongRooms/$(roomId))
+          && get(/databases/$(database)/documents/kongRooms/$(roomId)).data.paused == false
+          && request.resource.data.keys().hasOnly(['scene','name','text','hidden','createdAt'])
+          && request.resource.data.scene == get(/databases/$(database)/documents/kongRooms/$(roomId)).data.scene
+          && request.resource.data.name is string && request.resource.data.name.size() <= 18
+          && request.resource.data.text is string && request.resource.data.text.size() > 0
+          && request.resource.data.text.size() <= 160
+          && request.resource.data.hidden == false
+          && request.resource.data.createdAt == request.time;
+        allow update, delete: if teacher();
+      }
+    }
+  }
+}
